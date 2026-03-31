@@ -174,9 +174,9 @@ def main():
             "Error": errors,
             "Cotrol": controls,  # (v, omega) per step
         }
-        with open("data/task3_result.json", "w") as f:
+        with open("data/task_result.json", "w") as f:
             json.dump(data, f, indent=2)
-        print("数据已保存到 data/task3_result.json")
+        print("数据已保存到 data/task_result.json")
         time.sleep(0.5)
         p.disconnect()
         print("仿真结束")

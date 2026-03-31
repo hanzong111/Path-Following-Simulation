@@ -10,20 +10,18 @@ import pybullet as p
 import pybullet_data
 import time
 import math
-import json
-import os
 from drawpath import draw_smooth_path, generate_spline_waypoints
 from PurePursuit import PurePursuit
+from Save_Json import save_simulation_result
 
 # =============================================
 # ✅ 在这里直接修改你的路径点和参数！
 # =============================================
 CONFIG = {
-    "waypoints": [(0.0, 0.0), (5.0, 0.0), (5, 10), (3, 8)],  # ← 改这里
-    "lookahead": 0.5,
+    "waypoints": [(0.0, 0.0), (5.0, 0.0), (5, 6)],  # ← 改这里
+    "lookahead": 2.5,
     "max_speed": 2.5,
-    "min_speed": 0.5,
-    "smooth_follow": True,
+    "min_speed": 2,
 }
 # =============================================
 
@@ -55,7 +53,7 @@ def initialize():
 
     print(f"转向关节索引: {steering_joints}")
     print(f"驱动关节索引: {drive_joints}")
-    return robot_id, plane_id, steering_joints, drive_joints
+    return robot_id, steering_joints, drive_joints
 
 def apply_car_control(robot_id, steering_joints, drive_joints, v, omega):
     if v == 0:
@@ -75,6 +73,48 @@ def apply_car_control(robot_id, steering_joints, drive_joints, v, omega):
         p.setJointMotorControl2(robot_id, joint, p.VELOCITY_CONTROL,
                                 targetVelocity=wheel_speed)
 
+def min_distance_to_path(robot_pos, waypoints):
+    """Calculate minimum distance from robot to any path segment."""
+    import numpy as np
+    min_dist = float('inf')
+    for i in range(len(waypoints) - 1):
+        p1 = np.array(waypoints[i])
+        p2 = np.array(waypoints[i+1])
+        p = np.array(robot_pos[:2])
+        seg_vec = p2 - p1
+        seg_len_sq = np.dot(seg_vec, seg_vec)
+        if seg_len_sq == 0:
+            continue
+        t = np.dot(p - p1, seg_vec) / seg_len_sq
+        t = max(0.0, min(1.0, t))
+        closest = p1 + t * seg_vec
+        dist = np.linalg.norm(p - closest)
+        if dist < min_dist:
+            min_dist = dist
+    return min_dist
+
+def Generate_Spline_Path(user_waypoints, smooth_follow=True):
+    """
+    生成路径点（支持用户输入覆盖 + 可选平滑处理）
+
+    参数:
+        user_waypoints: 默认路径点 (list of tuples)
+        smooth_follow: 是否进行平滑处理 (bool)
+
+    返回:
+        controller_waypoints: 最终用于控制的路径点
+    """
+    # === 平滑路径处理 ===
+    try:
+        controller_waypoints = generate_spline_waypoints(user_waypoints)
+        print(f"已生成 {len(controller_waypoints)} 个平滑路径点用于跟随。")
+
+    except Exception as e:
+        print(f"平滑路径生成失败，使用原始路径点。错误: {e}")
+        controller_waypoints = user_waypoints
+
+    return controller_waypoints
+
 # ---------- 主程序 ----------
 def main():
     print("=== 路径跟踪参数设置 ===")
@@ -83,40 +123,15 @@ def main():
     lookahead      = CONFIG["lookahead"]
     max_speed      = CONFIG["max_speed"]
     min_speed      = CONFIG["min_speed"]
-    smooth_follow  = CONFIG["smooth_follow"]
 
-    try:
-        wp_input = input(f"路径点 (回车使用 CONFIG 默认 {user_waypoints}) ").strip()
-        if wp_input:
-            wp_list = wp_input.split(';')
-            user_waypoints = []
-            for wp in wp_list:
-                x, y = map(float, wp.split(','))
-                user_waypoints.append((x, y))
-            print(f"✅ 已覆盖 CONFIG,使用输入路径点: {user_waypoints}")
-        else:
-            print(f"✅ 使用 CONFIG 路径点: {user_waypoints}")
-    except EOFError:
-        print(f"⚠️ 无法读取 input()，使用 CONFIG 路径点: {user_waypoints}")
-
-    if smooth_follow:
-        try:
-            controller_waypoints = generate_spline_waypoints(user_waypoints)
-            print(f"已生成 {len(controller_waypoints)} 个平滑路径点用于跟随。")
-        except Exception as e:
-            print(f"平滑路径生成失败，使用原始路径点。错误: {e}")
-            controller_waypoints = user_waypoints
-            smooth_follow = False
-    else:
-        controller_waypoints = user_waypoints
-
-    robot_id, plane_id, steering_joints, drive_joints = initialize()
+    # 把点位都变成曲线，画在地上
+    controller_waypoints= Generate_Spline_Path(user_waypoints, smooth_follow=True)
+    robot_id, steering_joints, drive_joints = initialize()
     draw_smooth_path(controller_waypoints, color=[1, 0, 0], line_width=3)
     controller = PurePursuit(controller_waypoints, lookahead, max_speed, min_speed)
 
     dt = 1.0 / 240.0
-    max_steps = 10000
-    follow_cam = True
+    max_steps = 5000
 
     trajectory = []
     errors = []
@@ -133,53 +148,38 @@ def main():
             euler = p.getEulerFromQuaternion(orn)
             yaw = euler[2]
 
+            # 车辆方向与速度算法+控制
             v, omega = controller.compute_control(pos[:2], yaw)
             apply_car_control(robot_id, steering_joints, drive_joints, v, omega)
 
-            if follow_cam:
-                try:
-                    cam_yaw = yaw - math.pi / 2
-                    cam_yaw = cam_yaw % (2 * math.pi)
-                    cam_yaw_deg = math.degrees(cam_yaw)
-                    p.resetDebugVisualizerCamera(cameraDistance=2.0,
+            # 车辆跟随视角控制
+            cam_yaw = yaw - math.pi / 2
+            cam_yaw = cam_yaw % (2 * math.pi)
+            cam_yaw_deg = math.degrees(cam_yaw)
+            p.resetDebugVisualizerCamera(cameraDistance=2.0,
                                                  cameraYaw=cam_yaw_deg,
                                                  cameraPitch=-40,
                                                  cameraTargetPosition=pos)
-                except:
-                    pass
-
+                
             p.stepSimulation()
             time.sleep(dt)
-
+            # 将数据输出至命令行界面（CLI）
             trajectory.append((pos[0], pos[1]))
-            dists = [math.hypot(pos[0] - wp[0], pos[1] - wp[1]) for wp in user_waypoints]
-            error = min(dists)
+            error = min_distance_to_path(pos, user_waypoints)
             errors.append(error)
             controls.append((v, omega))
-
             if step % (int(0.5 / dt)) == 0:
                 print(f"步 {step}: 位置=({pos[0]:.2f},{pos[1]:.2f}), v={v:.2f}, ω={omega:.2f}, 误差={error:.2f}")
-
+            # 检查是否已经到终点
             if math.hypot(pos[0] - user_waypoints[-1][0], pos[1] - user_waypoints[-1][1]) < 0.3:
                 print("已到达终点！")
                 break
-
     except KeyboardInterrupt:
         print("\n用户中断")
 
     finally:
-        os.makedirs("data", exist_ok=True)
-        data = {
-            "Trajectory": trajectory,
-            "Error": errors,
-            "Cotrol": controls,  # (v, omega) per step
-        }
-        with open("data/task3_result.json", "w") as f:
-            json.dump(data, f, indent=2)
-        print("数据已保存到 data/task3_result.json")
-        time.sleep(0.5)
-        p.disconnect()
-        print("仿真结束")
+        # 把结果存起来
+        save_simulation_result(trajectory, errors, controls, lookahead, max_speed, min_speed, folder="data")
 
 if __name__ == "__main__":
     main()
