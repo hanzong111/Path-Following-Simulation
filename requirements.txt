@@ -1,0 +1,5 @@
+numpy==2.4.4
+packaging==26.0
+pybullet==3.2.7
+setuptools==82.0.1
+wheel==0.46.3
