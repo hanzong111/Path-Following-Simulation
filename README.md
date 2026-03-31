@@ -1,5 +1,6 @@
 # 无人驾驶机器人仿真项目 – 路径跟踪与自动调参
 
+由于计算机GPU算力不足，难以支持 Isaac Sim 的运行，因此选用 PyBullet 作为替代仿真环境。
 本项目用于仿真实习生笔试任务，基于 PyBullet 仿真环境实现机器人的路径跟踪控制、数据采集、性能评估以及自动调参功能。
 
 ## 环境要求
@@ -83,3 +84,14 @@ python3 simulation3.py
     "control": [...]
 }
 ```
+### 3）任务四
+
+
+### 实验结果：
+
+![alt text](Task_Json.png)
+
+
+### Comparison.py 结果：
+
+![alt text](Summary_Output.png)
