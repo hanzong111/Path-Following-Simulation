@@ -25,9 +25,9 @@ from CarControl import apply_car_control , min_distance_to_path
 # =============================================
 CONFIG = {
     "waypoints": [(0.0, 0.0), (4, 1), (8, -1)],  # ← 改这里
-    "lookahead": 2.5,
-    "max_speed": 1.5,
-    "min_speed": 1,
+    "lookahead": 2,
+    "max_speed": 1,
+    "min_speed": 0.6,
 }
 # =============================================
 

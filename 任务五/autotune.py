@@ -14,9 +14,9 @@ WAYPOINTS = [(0.0, 0.0), (4, 1), (8, -1)]
 
 # 每个参数的 [最小值, 最大值, 步长]
 PARAM_BOUNDS = {
-    "lookahead": [1,  5, 0.5],
-    "max_speed": [1,  5, 0.5],
-    "min_speed": [0.5,  3, 0.5],
+    "lookahead": [2,  3, 0.1],
+    "max_speed": [1,  2, 0.1],
+    "min_speed": [0.5,  1.5, 0.1],
 }
 
 MAX_SIM_STEPS  = 10000

@@ -75,6 +75,28 @@ def apply_car_control(robot_id, steering_joints, drive_joints, v, omega):
         p.setJointMotorControl2(robot_id, joint, p.VELOCITY_CONTROL,
                                 targetVelocity=wheel_speed)
 
+def Generate_Spline_Path(user_waypoints, smooth_follow=True):
+    """
+    生成路径点（支持用户输入覆盖 + 可选平滑处理）
+
+    参数:
+        user_waypoints: 默认路径点 (list of tuples)
+        smooth_follow: 是否进行平滑处理 (bool)
+
+    返回:
+        controller_waypoints: 最终用于控制的路径点
+    """
+    # === 平滑路径处理 ===
+    try:
+        controller_waypoints = generate_spline_waypoints(user_waypoints)
+        print(f"已生成 {len(controller_waypoints)} 个平滑路径点用于跟随。")
+
+    except Exception as e:
+        print(f"平滑路径生成失败，使用原始路径点。错误: {e}")
+        controller_waypoints = user_waypoints
+
+    return controller_waypoints
+
 # ---------- 主程序 ----------
 def main():
     print("=== 路径跟踪参数设置 ===")
@@ -85,31 +107,8 @@ def main():
     min_speed      = CONFIG["min_speed"]
     smooth_follow  = CONFIG["smooth_follow"]
 
-    try:
-        wp_input = input(f"路径点 (回车使用 CONFIG 默认 {user_waypoints}) ").strip()
-        if wp_input:
-            wp_list = wp_input.split(';')
-            user_waypoints = []
-            for wp in wp_list:
-                x, y = map(float, wp.split(','))
-                user_waypoints.append((x, y))
-            print(f"✅ 已覆盖 CONFIG,使用输入路径点: {user_waypoints}")
-        else:
-            print(f"✅ 使用 CONFIG 路径点: {user_waypoints}")
-    except EOFError:
-        print(f"⚠️ 无法读取 input()，使用 CONFIG 路径点: {user_waypoints}")
-
-    if smooth_follow:
-        try:
-            controller_waypoints = generate_spline_waypoints(user_waypoints)
-            print(f"已生成 {len(controller_waypoints)} 个平滑路径点用于跟随。")
-        except Exception as e:
-            print(f"平滑路径生成失败，使用原始路径点。错误: {e}")
-            controller_waypoints = user_waypoints
-            smooth_follow = False
-    else:
-        controller_waypoints = user_waypoints
-
+    # 把点位都变成曲线，画在地上
+    controller_waypoints= Generate_Spline_Path(user_waypoints, smooth_follow=True)
     robot_id, plane_id, steering_joints, drive_joints = initialize()
     draw_smooth_path(controller_waypoints, color=[1, 0, 0], line_width=3)
     controller = PurePursuit(controller_waypoints, lookahead, max_speed, min_speed)
