@@ -8,20 +8,22 @@
 
 import pybullet as p
 import pybullet_data
+import numpy as np
 import time
 import math
 from drawpath import draw_smooth_path, generate_spline_waypoints
 from PurePursuit import PurePursuit
 from Save_Json import save_simulation_result
 
+
 # =============================================
 # ✅ 在这里直接修改你的路径点和参数！
 # =============================================
 CONFIG = {
     "waypoints": [(0.0, 0.0), (5.0, 0.0), (5, 6)],  # ← 改这里
-    "lookahead": 2.5,
-    "max_speed": 2.5,
-    "min_speed": 2,
+    "lookahead": 1.625,
+    "max_speed": 1,
+    "min_speed": 0.5,
 }
 # =============================================
 
@@ -75,7 +77,7 @@ def apply_car_control(robot_id, steering_joints, drive_joints, v, omega):
 
 def min_distance_to_path(robot_pos, waypoints):
     """Calculate minimum distance from robot to any path segment."""
-    import numpy as np
+
     min_dist = float('inf')
     for i in range(len(waypoints) - 1):
         p1 = np.array(waypoints[i])
